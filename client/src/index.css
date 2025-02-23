@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@layer base {
+    :root {
+      --font-sans: 'Moderustic', sans-serif; 
+    }
+}
