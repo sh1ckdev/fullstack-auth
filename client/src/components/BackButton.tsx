@@ -1,20 +1,23 @@
+import { useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 function BackButton() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const handleGoBack = () => {
+    const handleGoBack = useCallback(() => {
         if (location.key !== "default") {
-            navigate(-1); 
+            navigate(-1);
         } else {
-            navigate("/"); 
+            navigate("/");
         }
-    };
+    }, [location.key, navigate]);
 
     return (
         <button
-            onClick={() => handleGoBack()}
+            type="button"
+            aria-label="Назад"
+            onClick={handleGoBack}
             className="flex items-center space-x-1 text-blue-500 hover:text-blue-600 transition-colors my-5"
         >
             <svg
@@ -29,10 +32,11 @@ function BackButton() {
                     clipRule="evenodd"
                 />
             </svg>
-            {/* Текст "Назад" */}
             <span className="text-lg font-medium">Назад</span>
         </button>
     );
 }
 
 export default BackButton;
+
+

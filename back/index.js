@@ -10,9 +10,17 @@ const PORT = process.env.PORT || 5000;
 const app = express();
 
 app.use(cors({
-  origin: 'http://localhost:5175', 
-  credentials: true, 
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', 
+  origin: function(origin, callback) {
+    const allowed = (process.env.CLIENT_ORIGIN?.split(',') || ['http://localhost:5173','http://localhost:5174','http://localhost:5175']);
+    // allow requests with no origin (like mobile apps, curl)
+    if (!origin) return callback(null, true);
+    if (allowed.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   optionsSuccessStatus: 204,
 }));
 

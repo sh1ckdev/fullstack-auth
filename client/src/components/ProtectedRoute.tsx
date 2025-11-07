@@ -1,10 +1,15 @@
-// components/ProtectedRoute.js
 import { observer } from "mobx-react-lite";
 import { authStore } from "../stores/authStore";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
+import { ReactNode } from "react";
+import { ROUTES } from '../constants/routes';
 
-const ProtectedRoute = observer(({ children }) => {
-    console.log(authStore.isAuth);
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+const ProtectedRoute = observer(({ children }: ProtectedRouteProps) => {
+  const location = useLocation();
   if (authStore.isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900">
@@ -17,10 +22,12 @@ const ProtectedRoute = observer(({ children }) => {
   }
 
   if (!authStore.isAuth) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={ROUTES.signin} replace state={{ from: location.pathname }} />;
   }
 
   return children;
 });
 
 export default ProtectedRoute;
+
+

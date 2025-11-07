@@ -21,6 +21,9 @@ class UserController {
             res.cookie("refreshToken", userData.refreshToken, {
                 maxAge: 30 * 24 * 60 * 60 * 1000,
                 httpOnly: true,
+                path: '/',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                secure: process.env.NODE_ENV === 'production'
             });
 
             return res.json(userData);
@@ -35,6 +38,26 @@ class UserController {
             res.cookie("refreshToken", userData.refreshToken, {
                 maxAge: 30 * 24 * 60 * 60 * 1000,
                 httpOnly: true,
+                path: '/',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                secure: process.env.NODE_ENV === 'production'
+            });
+
+            return res.json(userData);
+        } catch (error) {
+            next(error);
+        }
+    }
+    async loginWithYandex(req, res, next) {
+        try {
+            const { code, redirectUri } = req.body;
+            const userData = await UserService.loginWithYandex(code, redirectUri);
+            res.cookie("refreshToken", userData.refreshToken, {
+                maxAge: 30 * 24 * 60 * 60 * 1000,
+                httpOnly: true,
+                path: '/',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                secure: process.env.NODE_ENV === 'production'
             });
 
             return res.json(userData);
@@ -55,15 +78,19 @@ class UserController {
     async refresh(req, res, next) {
         try {
             const { refreshToken } = req.cookies;
-            console.log(refreshToken);
+            if (!refreshToken) {
+                return next(ApiError.UnauthorizedError());
+            }
             const userData = await userService.refresh(refreshToken);
             res.cookie("refreshToken", userData.refreshToken, {
                 maxAge: 30 * 24 * 60 * 60 * 1000,
                 httpOnly: true,
+                path: '/',
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                secure: process.env.NODE_ENV === 'production'
             });
             return res.json(userData);
         } catch (error) {
-            console.error('Error during refresh:', error);
             next(error);
         }
     }
@@ -77,6 +104,27 @@ class UserController {
         }
     }
     
+    async me(req, res, next) {
+        try {
+            const user = await UserModel.findById(req.user.id).select('-password');
+            if (!user) return next(ApiError.NotFound('Пользователь не найден'));
+            res.json(user);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateMe(req, res, next) {
+        try {
+            const fieldsToUpdate = req.body || {};
+            const userId = req.user.id;
+            const updatedUser = await userService.updateProfile(fieldsToUpdate, userId);
+            return res.json({ message: 'Profile updated successfully', user: updatedUser });
+        } catch (error) {
+            next(error);
+        }
+    }
+
 
     async updateProfile(req, res, next) {
         try {
@@ -117,6 +165,35 @@ class UserController {
             }
     
             return res.json(user);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async forgotPassword(req, res, next) {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                return next(ApiError.BadRequest('Email обязателен'));
+            }
+            const result = await userService.requestPasswordReset(email);
+            return res.json(result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async resetPassword(req, res, next) {
+        try {
+            const { token, password } = req.body;
+            if (!token || !password) {
+                return next(ApiError.BadRequest('Токен и пароль обязательны'));
+            }
+            if (password.length < 6) {
+                return next(ApiError.BadRequest('Пароль должен содержать минимум 6 символов'));
+            }
+            const result = await userService.resetPassword(token, password);
+            return res.json(result);
         } catch (error) {
             next(error);
         }

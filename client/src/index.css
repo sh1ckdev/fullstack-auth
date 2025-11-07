@@ -2,6 +2,69 @@
 
 @layer base {
     :root {
-      --font-sans: 'Moderustic', sans-serif; 
+      --font-sans: 'Montserrat', Arial, sans-serif;
+      /* Палитра */
+      --brand: #926AEE; /* основной акцент */
+      --text: #E8E8E8; /* основной текст */
+      --text-muted: #BFBFBF; /* вторичный текст */
+      --bg-page: #060508; /* фон страницы */
+      --surface: #0B0A10; /* фон карточек/панелей (слегка светлее фона) */
+      --border: #1C1A22; /* границы/делители */
+      --focus: var(--brand);
+      /* дизайн-токены */
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 6px 20px rgba(0,0,0,0.35);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.25);
+      --container: 1200px;
+      --gap: 16px;
     }
+    
+    [data-theme="light"] {
+      --text: #060508;
+      --text-muted: #6B6B6B;
+      --bg-page: #E8E8E8;
+      --surface: #FFFFFF;
+      --border: #DDDDDD;
+      --shadow: 0 6px 20px rgba(0,0,0,0.08);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+    }
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/* layout утилиты */
+.shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100dvh;
+}
+.shell--noaside {
+  grid-template-columns: 1fr;
+}
+.shell__aside {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+.shell__main {
+  min-width: 0;
+}
+.container-max {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 24px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
