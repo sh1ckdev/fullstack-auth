@@ -41,9 +41,9 @@ services:
       context: ./client
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://backend:5000/api}
+        VITE_API_URL: ${VITE_API_URL:-https://chermanx.ru/api}
         VITE_YANDEX_CLIENT_ID: ${VITE_YANDEX_CLIENT_ID:-}
-        VITE_YANDEX_REDIRECT_URI: ${VITE_YANDEX_REDIRECT_URI:-http://localhost:4173/signin}
+        VITE_YANDEX_REDIRECT_URI: ${VITE_YANDEX_REDIRECT_URI:-https://chermanx.ru/signin}
     restart: unless-stopped
     env_file:
       - ./.env
