@@ -3,40 +3,61 @@ version: "3.9"
 services:
   mongo:
     image: mongo:7
+    container_name: fullstack-auth-mongo
     restart: unless-stopped
     env_file:
-      - ./.env
+      - .env
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-admin}
     volumes:
       - mongo-data:/data/db
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT:-27017}:27017"
+    networks:
+      - backend-network
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   backend:
+    container_name: fullstack-auth-backend
     build:
-      context: ./back
+      context: ./
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - ./.env
+      - .env
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: ${BACKEND_PORT:-5000}
       DB_URL: ${DB_URL:-mongodb://admin:admin@mongo:27017/fullstack-auth?authSource=admin}
       CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:4173}
       YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-}
       YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      API_URL: ${API_URL:-http://localhost:5000}
     ports:
-      - "5000:5000"
+      - "${BACKEND_PORT:-5000}:5000"
+    networks:
+      - backend-network
     depends_on:
       mongo:
         condition: service_healthy
 
 volumes:
   mongo-data:
+    name: fullstack-auth-mongo-data
+
+networks:
+  backend-network:
+    name: fullstack-auth-backend
+    driver: bridge
