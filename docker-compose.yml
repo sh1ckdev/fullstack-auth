@@ -11,6 +11,8 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-admin}
     volumes:
       - mongo-data:/data/db
+    ports:
+      - "27017:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
       interval: 10s
@@ -36,24 +38,5 @@ services:
       mongo:
         condition: service_healthy
 
-  frontend:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-https://chermanx.ru/api}
-        VITE_YANDEX_CLIENT_ID: ${VITE_YANDEX_CLIENT_ID:-}
-        VITE_YANDEX_REDIRECT_URI: ${VITE_YANDEX_REDIRECT_URI:-https://chermanx.ru/signin}
-    restart: unless-stopped
-    env_file:
-      - ./.env
-    ports:
-      - "4173:4173"
-    depends_on:
-      backend:
-        condition: service_started
-
 volumes:
   mongo-data:
-
-
