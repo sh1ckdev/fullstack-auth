@@ -10,12 +10,14 @@ import { Button } from './ui/Button';
 import { ROUTES } from '../constants/routes';
 import { YANDEX_CLIENT_ID, YANDEX_REDIRECT_URI } from '../utils/env';
 import { EyeIcon, EyeSlashIcon, UserIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import GhostCursor from './effects/GhostCursor';
 
 interface LoginFormProps {
   type?: 'signin';
 }
 
 const LoginForm = observer(({}: LoginFormProps) => {
+  const [bgOpacity, setBgOpacity] = useState<number>(0);
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
@@ -167,6 +169,21 @@ const LoginForm = observer(({}: LoginFormProps) => {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+            {/* <GhostCursor
+        color="#B19EEF"
+        brightness={1}
+        edgeIntensity={0}
+        trailLength={50}
+        inertia={0.5}
+        grainIntensity={0.05}
+        bloomStrength={0.1}
+        bloomRadius={1.0}
+        bloomThreshold={0.025}
+        fadeDelayMs={1000}
+        fadeDurationMs={1500}
+        className="z-0"
+        onOpacityChange={setBgOpacity}
+      /> */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
         <h1 className="text-[200px] md:text-[300px] lg:text-[400px] font-bold select-none tracking-tighter" style={{ color: 'color-mix(in oklab, var(--text) 30%, transparent)' }}>
           xtra.dev
