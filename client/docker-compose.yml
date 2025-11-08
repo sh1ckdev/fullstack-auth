@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+      args:
+        API_URL: ${API_URL:-https://chermanx.ru/api}
+        YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-}
+        YANDEX_REDIRECT_URI: ${ANDEX_REDIRECT_URI:-https://chermanx.ru/signin}
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "4173:4173"
+
+
+volumes:
+  mongo-data:
+
+
