@@ -7,9 +7,9 @@ services:
       context: ./
       dockerfile: Dockerfile
       args:
-        API_URL: ${API_URL:-https://chermanx.ru/api}
-        YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-}
-        YANDEX_REDIRECT_URI: ${YANDEX_REDIRECT_URI:-https://chermanx.ru/signin}
+        VITE_API_URL: ${VITE_API_URL:-http://0.0.0.0:5000/api}
+        VITE_YANDEX_CLIENT_ID: ${VITE_YANDEX_CLIENT_ID:-}
+        VITE_YANDEX_REDIRECT_URI: ${VITE_YANDEX_REDIRECT_URI:-https://chermanx.ru/signin}
     restart: unless-stopped
     env_file:
       - .env
