@@ -2,21 +2,19 @@ version: "3.9"
 
 services:
   frontend:
-    container_name: fullstack-auth-frontend
     build:
       context: ./
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://0.0.0.0:5000/api}
-        VITE_YANDEX_CLIENT_ID: ${VITE_YANDEX_CLIENT_ID:-}
-        VITE_YANDEX_REDIRECT_URI: ${VITE_YANDEX_REDIRECT_URI:-https://chermanx.ru/signin}
+        VITE_APP_NAME: ${VITE_APP_NAME:-Fullstack Auth}
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_YANDEX_CLIENT_ID: ${VITE_YANDEX_CLIENT_ID}
+        VITE_YANDEX_REDIRECT_URI: ${VITE_YANDEX_REDIRECT_URI}
     restart: unless-stopped
     env_file:
       - .env
     ports:
-      - "0.0.0.0:${PORT:-4173}:4173"
-    environment:
-      NODE_ENV: production
+      - "${FRONTEND_PORT:-4173}:4173"
     networks:
       - frontend-network
 
