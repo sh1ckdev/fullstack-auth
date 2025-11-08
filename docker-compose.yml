@@ -11,6 +11,8 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-admin}
     volumes:
       - mongo-data:/data/db
+    ports:
+      - "0.0.0.0:27017:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 })"]
       interval: 10s
@@ -31,7 +33,7 @@ services:
       YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-}
       YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-}
     ports:
-      - "5000:5000"
+      - "0.0.0.0:5000:5000"
     depends_on:
       mongo:
         condition: service_healthy
@@ -48,7 +50,7 @@ services:
     env_file:
       - ./.env
     ports:
-      - "4173:4173"
+      - "0.0.0.0:4173:4173"
     depends_on:
       backend:
         condition: service_started
