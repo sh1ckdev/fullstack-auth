@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { authStore } from '../stores/authStore';
 import { observer } from "mobx-react-lite";
@@ -12,7 +12,8 @@ import { YANDEX_CLIENT_ID, YANDEX_REDIRECT_URI } from '../utils/env';
 import { EyeIcon, EyeSlashIcon, UserIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import GhostCursor from './effects/GhostCursor';
 
-const YANDEX_BUTTON_CONTAINER_ID = 'yandex-auth-suggest';
+const YANDEX_POPUP_FEATURES =
+  'width=640,height=720,menubar=no,toolbar=no,status=no,scrollbars=yes,resizable=yes';
 
 interface LoginFormProps {
   type?: 'signin';
@@ -31,7 +32,7 @@ const LoginForm = observer(({}: LoginFormProps) => {
   const [submitted, setSubmitted] = useState(false);
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const [isProcessingYandex, setIsProcessingYandex] = useState(false);
-  const [isYandexButtonReady, setIsYandexButtonReady] = useState(false);
+  const popupRef = useRef<Window | null>(null);
 
   const yandexClientId = YANDEX_CLIENT_ID;
   const yandexRedirectUri = useMemo(() => {
@@ -113,108 +114,68 @@ const LoginForm = observer(({}: LoginFormProps) => {
   }, [username, password, touched, submitted]);
 
   useEffect(() => {
-    if (!isYandexConfigured || typeof window === 'undefined' || hasYandexCallback) {
-      return;
-    }
-
-    setIsYandexButtonReady(false);
-
-    let cancelled = false;
-    let attempts = 0;
-
-    const initSuggestButton = () => {
-      const suggest = (window as any).YaAuthSuggest;
-
-      if (!suggest || typeof suggest.init !== 'function') {
-        if (attempts < 20) {
-          attempts += 1;
-          setTimeout(initSuggestButton, 150);
-        }
-        return;
-      }
-
-      const stateValue = Math.random().toString(36).slice(2, 10);
-      sessionStorage.setItem('yandex_oauth_state', stateValue);
-
-      suggest
-        .init(
-          {
-            client_id: yandexClientId,
-            response_type: 'code',
-            redirect_uri: yandexRedirectUri,
-            state: stateValue,
-          },
-          window.location.origin,
-          {
-            view: 'button',
-            parentId: YANDEX_BUTTON_CONTAINER_ID,
-            buttonView: 'main',
-            buttonTheme: 'dark',
-            buttonSize: 'm',
-            buttonBorderRadius: 12,
-          }
-        )
-        .then(({ handler }: { handler: () => Promise<unknown> }) => {
-          if (cancelled) return;
-          return handler();
-        })
-        .then((result: any) => {
-          if (!cancelled) {
-            setIsYandexButtonReady(true);
-          }
-          if (!result || cancelled) {
-            return;
-          }
-
-          if (result.status === 'error') {
-            const errorDescription =
-              result.error_description || result.error || 'Не удалось выполнить вход через Yandex ID';
-            toast.error(errorDescription);
-            return;
-          }
-
-          const extractedCode = result.code ?? result?.data?.code;
-          const extractedState = result.state ?? result?.data?.state;
-
-          if (extractedCode) {
-            void finishYandexLogin(extractedCode, extractedState);
-          }
-        })
-        .catch((error: unknown) => {
-          console.error('YaAuthSuggest initialization error', error);
-          if (!cancelled) {
-            setIsYandexButtonReady(false);
-          }
-        });
-    };
-
-    initSuggestButton();
-
-    return () => {
-      cancelled = true;
-      const container = document.getElementById(YANDEX_BUTTON_CONTAINER_ID);
-      if (container) {
-        container.innerHTML = '';
-      }
-    };
-  }, [isYandexConfigured, yandexClientId, yandexRedirectUri, finishYandexLogin, hasYandexCallback]);
-
-  useEffect(() => {
     if (authStore.isAuth) {
       navigate(ROUTES.profile);
     }
   }, [navigate, authStore.isAuth]);
 
   useEffect(() => {
+    if (!isYandexConfigured || typeof window === 'undefined') {
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      const data = event.data ?? {};
+
+      if (data.type === 'YANDEX_AUTH_SUCCESS') {
+        popupRef.current?.close();
+        popupRef.current = null;
+        void finishYandexLogin(data.code, data.state);
+      } else if (data.type === 'YANDEX_AUTH_ERROR') {
+        popupRef.current?.close();
+        popupRef.current = null;
+        const message =
+          typeof data.error === 'string' && data.error.trim().length > 0
+            ? data.error
+            : 'Не удалось выполнить вход через Yandex ID';
+        toast.error(message);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [isYandexConfigured, finishYandexLogin]);
+
+  useEffect(() => {
     const code = searchParams.get('code');
     const error = searchParams.get('error');
     const returnedState = searchParams.get('state');
 
-    if (error) {
+    if (!hasYandexCallback || typeof window === 'undefined') {
+      return;
+    }
+
+    if (window.opener && window.opener !== window) {
+      const payload = code
+        ? { type: 'YANDEX_AUTH_SUCCESS', code, state: returnedState ?? null }
+        : {
+            type: 'YANDEX_AUTH_ERROR',
+            error: error ? decodeURIComponent(error) : undefined,
+          };
+      window.opener.postMessage(payload, window.location.origin);
+      window.close();
+      return;
+    }
+
+    if (error && !code) {
       toast.error(`Yandex ID: ${decodeURIComponent(error)}`);
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('yandex_oauth_state');
-      }
       navigate(ROUTES.signin, { replace: true });
       return;
     }
@@ -224,7 +185,13 @@ const LoginForm = observer(({}: LoginFormProps) => {
     }
 
     void finishYandexLogin(code, returnedState);
-  }, [searchParams, isProcessingYandex, finishYandexLogin]);
+  }, [
+    hasYandexCallback,
+    searchParams,
+    finishYandexLogin,
+    navigate,
+    isProcessingYandex,
+  ]);
 
   const localSubmitLoading = authStore.isLoading && !isProcessingYandex;
 
@@ -242,6 +209,40 @@ const LoginForm = observer(({}: LoginFormProps) => {
     } else {
       toast.error(authStore.message || 'Ошибка входа');
     }
+  };
+
+  const handleYandexLogin = () => {
+    if (!isYandexConfigured) {
+      toast.error('Интеграция с Yandex ID недоступна. Проверьте настройки.');
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const stateValue = Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem('yandex_oauth_state', stateValue);
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: yandexClientId,
+      redirect_uri: yandexRedirectUri,
+      scope: 'login:email login:info',
+      state: stateValue,
+    });
+
+    const authUrl = `https://oauth.yandex.ru/authorize?${params.toString()}`;
+
+    const popup = window.open(authUrl, 'yandex_oauth', YANDEX_POPUP_FEATURES);
+
+    if (!popup) {
+      toast.error('Не удалось открыть окно авторизации. Разрешите всплывающие окна.');
+      return;
+    }
+
+    popupRef.current = popup;
+    popup.focus();
   };
 
   return (
@@ -350,12 +351,16 @@ const LoginForm = observer(({}: LoginFormProps) => {
             <span>или</span>
             <span className="h-px flex-1 bg-[var(--border)]/60" />
           </div>
-          <div id={YANDEX_BUTTON_CONTAINER_ID} className="flex justify-center" />
-          {!isYandexButtonReady && isYandexConfigured && (
-            <p className="text-xs text-center text-[var(--text-muted)]">
-              Загружаем виджет Yandex ID...
-            </p>
-          )}
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full gap-2"
+            onClick={handleYandexLogin}
+            disabled={!isYandexConfigured || authStore.isLoading}
+            loading={isProcessingYandex && authStore.isLoading}
+          >
+            <span className="font-medium">Войти через Yandex ID</span>
+          </Button>
           {!isYandexConfigured && (
             <p className="text-xs text-center text-[var(--text-muted)]">
               Укажите VITE_YANDEX_CLIENT_ID и VITE_YANDEX_REDIRECT_URI в настройках окружения, чтобы активировать вход через Yandex ID.
