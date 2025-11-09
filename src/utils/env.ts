@@ -14,12 +14,20 @@ const resolveFallbackApi = () => {
   return `${normalize(window.location.origin)}/api`;
 };
 
+const resolveFallbackYandexRedirect = () => {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+  return `${normalize(window.location.origin)}/oauth/yandex/callback`;
+};
+
 export const API_URL = normalize(
   env?.VITE_API_URL ?? env?.API_URL ?? resolveFallbackApi()
 );
 
 export const YANDEX_CLIENT_ID = env?.VITE_YANDEX_CLIENT_ID ?? env?.YANDEX_CLIENT_ID ?? '';
-export const YANDEX_REDIRECT_URI = env?.VITE_YANDEX_REDIRECT_URI ?? env?.YANDEX_REDIRECT_URI ?? '';
+export const YANDEX_REDIRECT_URI =
+  env?.VITE_YANDEX_REDIRECT_URI ?? env?.YANDEX_REDIRECT_URI ?? resolveFallbackYandexRedirect();
 
 if (!API_URL) {
   throw new Error('API_URL is not defined. Please set VITE_API_URL in your environment.');

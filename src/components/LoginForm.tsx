@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { authStore } from '../stores/authStore';
-import { observer } from "mobx-react-lite";
+import { observer } from 'mobx-react-lite';
 import { loginSchema } from '../utils/validation';
 import { toast } from 'react-hot-toast';
 import { FormField } from './ui/FormField';
@@ -40,16 +40,13 @@ const LoginForm = observer(({}: LoginFormProps) => {
       return YANDEX_REDIRECT_URI;
     }
     if (typeof window !== 'undefined') {
-      return `${window.location.origin}${ROUTES.signin}`;
+      return `${window.location.origin}${ROUTES.yandexCallback}`;
     }
     return '';
   }, []);
   const isYandexConfigured = Boolean(yandexClientId && yandexRedirectUri);
-  const hasYandexCallback = useMemo(
-    () => Boolean(searchParams.get('code') || searchParams.get('error')),
-    [searchParams]
-  );
-  const finishYandexLogin = useCallback(
+
+  const finalizeYandexLogin = useCallback(
     async (code: string, returnedState?: string | null) => {
       if (!code) {
         return;
@@ -114,12 +111,6 @@ const LoginForm = observer(({}: LoginFormProps) => {
   }, [username, password, touched, submitted]);
 
   useEffect(() => {
-    if (authStore.isAuth) {
-      navigate(ROUTES.profile);
-    }
-  }, [navigate, authStore.isAuth]);
-
-  useEffect(() => {
     if (!isYandexConfigured || typeof window === 'undefined') {
       return;
     }
@@ -134,7 +125,7 @@ const LoginForm = observer(({}: LoginFormProps) => {
       if (data.type === 'YANDEX_AUTH_SUCCESS') {
         popupRef.current?.close();
         popupRef.current = null;
-        void finishYandexLogin(data.code, data.state);
+        void finalizeYandexLogin(data.code, data.state);
       } else if (data.type === 'YANDEX_AUTH_ERROR') {
         popupRef.current?.close();
         popupRef.current = null;
@@ -151,31 +142,24 @@ const LoginForm = observer(({}: LoginFormProps) => {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [isYandexConfigured, finishYandexLogin]);
+  }, [isYandexConfigured, finalizeYandexLogin]);
+
+  useEffect(() => {
+    if (authStore.isAuth) {
+      navigate(ROUTES.profile);
+    }
+  }, [navigate, authStore.isAuth]);
 
   useEffect(() => {
     const code = searchParams.get('code');
     const error = searchParams.get('error');
     const returnedState = searchParams.get('state');
 
-    if (!hasYandexCallback || typeof window === 'undefined') {
-      return;
-    }
-
-    if (window.opener && window.opener !== window) {
-      const payload = code
-        ? { type: 'YANDEX_AUTH_SUCCESS', code, state: returnedState ?? null }
-        : {
-            type: 'YANDEX_AUTH_ERROR',
-            error: error ? decodeURIComponent(error) : undefined,
-          };
-      window.opener.postMessage(payload, window.location.origin);
-      window.close();
-      return;
-    }
-
-    if (error && !code) {
+    if (error) {
       toast.error(`Yandex ID: ${decodeURIComponent(error)}`);
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('yandex_oauth_state');
+      }
       navigate(ROUTES.signin, { replace: true });
       return;
     }
@@ -184,14 +168,8 @@ const LoginForm = observer(({}: LoginFormProps) => {
       return;
     }
 
-    void finishYandexLogin(code, returnedState);
-  }, [
-    hasYandexCallback,
-    searchParams,
-    finishYandexLogin,
-    navigate,
-    isProcessingYandex,
-  ]);
+    void finalizeYandexLogin(code, returnedState);
+  }, [searchParams, isProcessingYandex, finalizeYandexLogin]);
 
   const localSubmitLoading = authStore.isLoading && !isProcessingYandex;
 
@@ -373,5 +351,3 @@ const LoginForm = observer(({}: LoginFormProps) => {
 });
 
 export default LoginForm;
-
-

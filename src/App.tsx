@@ -21,6 +21,7 @@ import { appStore } from './stores/appStore';
 import { themeStore } from './stores/themeStore';
 import { observer } from 'mobx-react-lite';
 import PublicLayout from './components/layout/PublicLayout';
+import YandexCallback from './pages/YandexCallback';
 
 const App = observer(() => {
     useEffect(() => {
@@ -87,6 +88,7 @@ const App = observer(() => {
                         </PublicRoute>
                     }
                 />
+                <Route path={ROUTES.yandexCallback} element={<YandexCallback />} />
                 <Route
                     path={ROUTES.profile}
                     element={

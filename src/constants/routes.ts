@@ -7,6 +7,7 @@ export const ROUTES = {
   profileSettings: '/profile/settings',
   forgotPassword: '/forgot-password',
   resetPassword: '/reset-password',
+  yandexCallback: '/oauth/yandex/callback',
 } as const;
 
 
