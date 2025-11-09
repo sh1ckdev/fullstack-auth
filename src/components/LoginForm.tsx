@@ -12,6 +12,8 @@ import { YANDEX_CLIENT_ID, YANDEX_REDIRECT_URI } from '../utils/env';
 import { EyeIcon, EyeSlashIcon, UserIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import GhostCursor from './effects/GhostCursor';
 
+const YANDEX_BUTTON_CONTAINER_ID = 'yandex-auth-suggest';
+
 interface LoginFormProps {
   type?: 'signin';
 }
@@ -30,6 +32,7 @@ const LoginForm = observer(({}: LoginFormProps) => {
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const [isProcessingYandex, setIsProcessingYandex] = useState(false);
   const [isRedirectingToYandex, setIsRedirectingToYandex] = useState(false);
+  const [isYandexButtonReady, setIsYandexButtonReady] = useState(false);
 
   const yandexClientId = YANDEX_CLIENT_ID;
   const yandexRedirectUri = useMemo(() => {
@@ -62,6 +65,76 @@ const LoginForm = observer(({}: LoginFormProps) => {
     }
     return false;
   }, [username, password, touched, submitted]);
+
+  useEffect(() => {
+    if (!isYandexConfigured || typeof window === 'undefined') {
+      return;
+    }
+
+    setIsYandexButtonReady(false);
+
+    let cancelled = false;
+    let attempts = 0;
+
+    const initSuggestButton = () => {
+      const suggest = (window as any).YaAuthSuggest;
+
+      if (!suggest || typeof suggest.init !== 'function') {
+        if (attempts < 20) {
+          attempts += 1;
+          setTimeout(initSuggestButton, 150);
+        }
+        return;
+      }
+
+      const stateValue = Math.random().toString(36).slice(2, 10);
+      sessionStorage.setItem('yandex_oauth_state', stateValue);
+
+      suggest
+        .init(
+          {
+            client_id: yandexClientId,
+            response_type: 'code',
+            redirect_uri: yandexRedirectUri,
+            state: stateValue,
+          },
+          window.location.origin,
+          {
+            view: 'button',
+            parentId: YANDEX_BUTTON_CONTAINER_ID,
+            buttonView: 'main',
+            buttonTheme: 'dark',
+            buttonSize: 'm',
+            buttonBorderRadius: 12,
+          }
+        )
+        .then(({ handler }: { handler: () => Promise<unknown> }) => {
+          if (cancelled) return;
+          return handler();
+        })
+        .then(() => {
+          if (!cancelled) {
+            setIsYandexButtonReady(true);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('YaAuthSuggest initialization error', error);
+          if (!cancelled) {
+            setIsYandexButtonReady(false);
+          }
+        });
+    };
+
+    initSuggestButton();
+
+    return () => {
+      cancelled = true;
+      const container = document.getElementById(YANDEX_BUTTON_CONTAINER_ID);
+      if (container) {
+        container.innerHTML = '';
+      }
+    };
+  }, [isYandexConfigured, yandexClientId, yandexRedirectUri]);
 
   useEffect(() => {
     if (authStore.isAuth) {
@@ -273,16 +346,19 @@ const LoginForm = observer(({}: LoginFormProps) => {
             <span>или</span>
             <span className="h-px flex-1 bg-[var(--border)]/60" />
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full gap-2"
-            onClick={handleYandexLogin}
-            loading={yandexButtonLoading}
-            disabled={!isYandexConfigured || authStore.isLoading}
-          >
-            <span className="font-medium">Войти через Yandex ID</span>
-          </Button>
+          <div id={YANDEX_BUTTON_CONTAINER_ID} className="flex justify-center" />
+          {(!isYandexButtonReady || !isYandexConfigured) && (
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full gap-2"
+              onClick={handleYandexLogin}
+              loading={yandexButtonLoading}
+              disabled={!isYandexConfigured || authStore.isLoading}
+            >
+              <span className="font-medium">Войти через Yandex ID</span>
+            </Button>
+          )}
           {!isYandexConfigured && (
             <p className="text-xs text-center text-[var(--text-muted)]">
               Укажите VITE_YANDEX_CLIENT_ID и VITE_YANDEX_REDIRECT_URI в настройках окружения, чтобы активировать вход через Yandex ID.
