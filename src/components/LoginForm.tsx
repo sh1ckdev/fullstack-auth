@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { authStore } from '../stores/authStore';
 import { observer } from "mobx-react-lite";
@@ -31,7 +31,6 @@ const LoginForm = observer(({}: LoginFormProps) => {
   const [submitted, setSubmitted] = useState(false);
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const [isProcessingYandex, setIsProcessingYandex] = useState(false);
-  const [isRedirectingToYandex, setIsRedirectingToYandex] = useState(false);
   const [isYandexButtonReady, setIsYandexButtonReady] = useState(false);
 
   const yandexClientId = YANDEX_CLIENT_ID;
@@ -45,6 +44,49 @@ const LoginForm = observer(({}: LoginFormProps) => {
     return '';
   }, []);
   const isYandexConfigured = Boolean(yandexClientId && yandexRedirectUri);
+  const finishYandexLogin = useCallback(
+    async (code: string, returnedState?: string | null) => {
+      if (!code) {
+        return;
+      }
+
+      if (!yandexRedirectUri) {
+        toast.error('Yandex ID: redirect URI не настроен.');
+        return;
+      }
+
+      const expectedState =
+        typeof window !== 'undefined' ? sessionStorage.getItem('yandex_oauth_state') : null;
+
+      if (expectedState && returnedState && expectedState !== returnedState) {
+        toast.error('Некорректный ответ от Yandex ID. Попробуйте снова.');
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('yandex_oauth_state');
+        }
+        navigate(ROUTES.signin, { replace: true });
+        return;
+      }
+
+      setIsProcessingYandex(true);
+
+      try {
+        await authStore.loginWithYandex(code, yandexRedirectUri);
+        toast.success('Вход через Yandex ID выполнен');
+        const from = (location.state as any)?.from || ROUTES.profile;
+        navigate(from, { replace: true });
+      } catch (err) {
+        const message = authStore.message || 'Не удалось выполнить вход через Yandex ID';
+        toast.error(message);
+        navigate(ROUTES.signin, { replace: true });
+      } finally {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('yandex_oauth_state');
+        }
+        setIsProcessingYandex(false);
+      }
+    },
+    [authStore, navigate, location.state, yandexRedirectUri]
+  );
 
   const isValid = useMemo(() => {
     const result = loginSchema.safeParse({ username, password });
@@ -112,9 +154,26 @@ const LoginForm = observer(({}: LoginFormProps) => {
           if (cancelled) return;
           return handler();
         })
-        .then(() => {
+        .then((result: any) => {
           if (!cancelled) {
             setIsYandexButtonReady(true);
+          }
+          if (!result || cancelled) {
+            return;
+          }
+
+          if (result.status === 'error') {
+            const errorDescription =
+              result.error_description || result.error || 'Не удалось выполнить вход через Yandex ID';
+            toast.error(errorDescription);
+            return;
+          }
+
+          const extractedCode = result.code ?? result?.data?.code;
+          const extractedState = result.state ?? result?.data?.state;
+
+          if (extractedCode) {
+            void finishYandexLogin(extractedCode, extractedState);
           }
         })
         .catch((error: unknown) => {
@@ -134,7 +193,7 @@ const LoginForm = observer(({}: LoginFormProps) => {
         container.innerHTML = '';
       }
     };
-  }, [isYandexConfigured, yandexClientId, yandexRedirectUri]);
+  }, [isYandexConfigured, yandexClientId, yandexRedirectUri, finishYandexLogin]);
 
   useEffect(() => {
     if (authStore.isAuth) {
@@ -160,46 +219,10 @@ const LoginForm = observer(({}: LoginFormProps) => {
       return;
     }
 
-    if (!yandexRedirectUri) {
-      toast.error('Yandex ID: redirect URI не настроен.');
-      return;
-    }
-
-    const expectedState = typeof window !== 'undefined' ? sessionStorage.getItem('yandex_oauth_state') : null;
-    if (expectedState && returnedState && expectedState !== returnedState) {
-      toast.error('Некорректный ответ от Yandex ID. Попробуйте снова.');
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('yandex_oauth_state');
-      }
-      navigate(ROUTES.signin, { replace: true });
-      return;
-    }
-
-    const performLogin = async () => {
-      setIsProcessingYandex(true);
-      try {
-        await authStore.loginWithYandex(code, yandexRedirectUri);
-        toast.success('Вход через Yandex ID выполнен');
-        const from = (location.state as any)?.from || ROUTES.profile;
-        navigate(from, { replace: true });
-      } catch (err) {
-        const message = authStore.message || 'Не удалось выполнить вход через Yandex ID';
-        toast.error(message);
-        navigate(ROUTES.signin, { replace: true });
-      } finally {
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('yandex_oauth_state');
-        }
-        setIsProcessingYandex(false);
-        setIsRedirectingToYandex(false);
-      }
-    };
-
-    void performLogin();
-  }, [searchParams, isProcessingYandex, authStore, navigate, location.state, yandexRedirectUri]);
+    void finishYandexLogin(code, returnedState);
+  }, [searchParams, isProcessingYandex, finishYandexLogin]);
 
   const localSubmitLoading = authStore.isLoading && !isProcessingYandex;
-  const yandexButtonLoading = isRedirectingToYandex || (isProcessingYandex && authStore.isLoading);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -215,29 +238,6 @@ const LoginForm = observer(({}: LoginFormProps) => {
     } else {
       toast.error(authStore.message || 'Ошибка входа');
     }
-  };
-
-  const handleYandexLogin = () => {
-    if (!isYandexConfigured) {
-      toast.error('Интеграция с Yandex ID недоступна. Проверьте настройки.');
-      return;
-    }
-
-    const stateValue = Math.random().toString(36).slice(2, 10);
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('yandex_oauth_state', stateValue);
-    }
-
-    const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: yandexClientId,
-      redirect_uri: yandexRedirectUri,
-      scope: 'login:email login:info',
-      state: stateValue,
-    });
-
-    setIsRedirectingToYandex(true);
-    window.location.href = `https://oauth.yandex.ru/authorize?${params.toString()}`;
   };
 
   return (
@@ -267,7 +267,7 @@ const LoginForm = observer(({}: LoginFormProps) => {
         onSubmit={handleSubmit}
         className="relative z-10 p-8 rounded-2xl shadow-xl max-w-md w-full border border-[var(--border)]/30 bg-[var(--surface)]/60 backdrop-blur-xs"
       >
-        <h2 className="text-3xl text-[var(--text)] text-center mb-8 font-semibold">Вход</h2>
+        <h2 className="text-3xl text-[var(--text)] text-center mb-8 font-semibold">Авторизация</h2>
 
         <FormField label="Имя пользователя" htmlFor="username">
           <Input
@@ -347,17 +347,10 @@ const LoginForm = observer(({}: LoginFormProps) => {
             <span className="h-px flex-1 bg-[var(--border)]/60" />
           </div>
           <div id={YANDEX_BUTTON_CONTAINER_ID} className="flex justify-center" />
-          {(!isYandexButtonReady || !isYandexConfigured) && (
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full gap-2"
-              onClick={handleYandexLogin}
-              loading={yandexButtonLoading}
-              disabled={!isYandexConfigured || authStore.isLoading}
-            >
-              <span className="font-medium">Войти через Yandex ID</span>
-            </Button>
+          {!isYandexButtonReady && isYandexConfigured && (
+            <p className="text-xs text-center text-[var(--text-muted)]">
+              Загружаем виджет Yandex ID...
+            </p>
           )}
           {!isYandexConfigured && (
             <p className="text-xs text-center text-[var(--text-muted)]">
