@@ -44,6 +44,10 @@ const LoginForm = observer(({}: LoginFormProps) => {
     return '';
   }, []);
   const isYandexConfigured = Boolean(yandexClientId && yandexRedirectUri);
+  const hasYandexCallback = useMemo(
+    () => Boolean(searchParams.get('code') || searchParams.get('error')),
+    [searchParams]
+  );
   const finishYandexLogin = useCallback(
     async (code: string, returnedState?: string | null) => {
       if (!code) {
@@ -109,7 +113,7 @@ const LoginForm = observer(({}: LoginFormProps) => {
   }, [username, password, touched, submitted]);
 
   useEffect(() => {
-    if (!isYandexConfigured || typeof window === 'undefined') {
+    if (!isYandexConfigured || typeof window === 'undefined' || hasYandexCallback) {
       return;
     }
 
@@ -193,7 +197,7 @@ const LoginForm = observer(({}: LoginFormProps) => {
         container.innerHTML = '';
       }
     };
-  }, [isYandexConfigured, yandexClientId, yandexRedirectUri, finishYandexLogin]);
+  }, [isYandexConfigured, yandexClientId, yandexRedirectUri, finishYandexLogin, hasYandexCallback]);
 
   useEffect(() => {
     if (authStore.isAuth) {
