@@ -3,9 +3,37 @@ import { authStore } from "../stores/authStore";
 import { UserIcon, AtSymbolIcon, ShieldCheckIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { Card } from "../components/ui/Card";
 
+const resolveAvatarUrl = (url?: string | null) => {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('yandex') && parsed.pathname.includes('/get-yapic/')) {
+      const segments = parsed.pathname.split('/').filter(Boolean);
+      if (segments.length >= 3) {
+        const group = segments[1];
+        const identifier = segments[2];
+        const requestedSize = segments[3] ?? 'islands-200';
+        const normalizedSize = requestedSize.includes('retina')
+          ? requestedSize.replace('retina-', '')
+          : requestedSize;
+
+        return `https://avatars.mds.yandex.net/get-yapic/${group}/${identifier}/${normalizedSize}`;
+      }
+    }
+    return url;
+  } catch (error) {
+    console.warn('Failed to normalize avatar url', error);
+    return url;
+  }
+};
+
 const Profile = observer(() => {
   const roles = authStore.user?.roles || [];
   const isAdmin = roles.includes('admin');
+  const avatarUrl = resolveAvatarUrl(authStore.user?.avatarUrl);
 
   return (
     <div className="space-y-6">
@@ -41,7 +69,20 @@ const Profile = observer(() => {
         <Card title="Статус аккаунта">
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-4 rounded-lg bg-[var(--bg-page)] border border-[var(--border)]">
-              <img src={authStore.user?.avatarUrl || ''} alt="Avatar" className="w-10 h-10 rounded-full" />
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="w-16 h-16 rounded-full object-cover"
+                  onError={(event) => {
+                    (event.currentTarget as HTMLImageElement).src = '/images/default-avatar.svg';
+                  }}
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-[var(--border)] flex items-center justify-center text-[var(--text-muted)]">
+                  <UserIcon className="h-8 w-8" />
+                </div>
+              )}
             </div>
           </div>
         </Card>
