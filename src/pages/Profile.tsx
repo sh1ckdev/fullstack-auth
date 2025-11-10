@@ -41,27 +41,7 @@ const Profile = observer(() => {
         <Card title="Статус аккаунта">
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-4 rounded-lg bg-[var(--bg-page)] border border-[var(--border)]">
-              <ShieldCheckIcon className="h-5 w-5 text-green-500" />
-              <div>
-                <div className="text-sm text-[var(--text-muted)]">Статус</div>
-                <div className="font-semibold text-[var(--text)]">Активен</div>
-              </div>
-            </div>
-            {isAdmin && (
-              <div className="flex items-center gap-3 p-4 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/30">
-                <ShieldCheckIcon className="h-5 w-5 text-[var(--brand)]" />
-                <div>
-                  <div className="text-sm text-[var(--text-muted)]">Роль</div>
-                  <div className="font-semibold text-[var(--text)]">Администратор</div>
-                </div>
-              </div>
-            )}
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-[var(--bg-page)] border border-[var(--border)]">
-              <ClockIcon className="h-5 w-5 text-[var(--text-muted)]" />
-              <div>
-                <div className="text-sm text-[var(--text-muted)]">Сессия</div>
-                <div className="font-semibold text-[var(--text)]">{authStore.isAuth ? 'Авторизован' : 'Гость'}</div>
-              </div>
+              <img src={authStore.user?.avatarUrl || ''} alt="Avatar" className="w-10 h-10 rounded-full" />
             </div>
           </div>
         </Card>
