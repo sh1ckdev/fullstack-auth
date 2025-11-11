@@ -3,30 +3,44 @@ import { authStore } from "../stores/authStore";
 import { UserIcon, AtSymbolIcon, ShieldCheckIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { Card } from "../components/ui/Card";
 
-const resolveAvatarUrl = (url?: string | null) => {
-  if (!url) {
+const resolveAvatarUrl = (value?: string | null) => {
+  if (!value) {
     return null;
   }
 
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname.includes('yandex') && parsed.pathname.includes('/get-yapic/')) {
-      const segments = parsed.pathname.split('/').filter(Boolean);
-      if (segments.length >= 3) {
-        const group = segments[1];
-        const identifier = segments[2];
-        const requestedSize = segments[3] ?? 'islands-200';
-        const normalizedSize = requestedSize.includes('retina')
-          ? requestedSize.replace('retina-', '')
-          : requestedSize;
+  let candidate = typeof value === 'string' && value.trim ? value.trim() : value;
 
-        return `https://avatars.mds.yandex.net/get-yapic/${group}/${identifier}/${normalizedSize}`;
-      }
+  if (!candidate) {
+    return null;
+  }
+
+  if (!/^https?:\/\//i.test(candidate)) {
+    candidate = `https://avatars.mds.yandex.net/get-yapic/${candidate}/islands-200`;
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    if (!parsed.hostname.includes('yandex') || !parsed.pathname.includes('/get-yapic/')) {
+      return candidate;
     }
-    return url;
+
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    const getYapicIndex = segments.indexOf('get-yapic');
+
+    if (getYapicIndex === -1 || segments.length - getYapicIndex < 3) {
+      return candidate;
+    }
+
+    const group = segments[getYapicIndex + 1];
+    const identifierSegments = segments.slice(getYapicIndex + 2, segments.length - 1);
+    const identifier = identifierSegments.join('/') || segments[getYapicIndex + 2];
+    const sizeSegment = segments[segments.length - 1] || 'islands-200';
+    const normalizedSize = sizeSegment.replace(/^islands-retina-/, 'islands-') || 'islands-200';
+
+    return `https://avatars.mds.yandex.net/get-yapic/${group}/${identifier}/${normalizedSize}`;
   } catch (error) {
     console.warn('Failed to normalize avatar url', error);
-    return url;
+    return candidate;
   }
 };
 
