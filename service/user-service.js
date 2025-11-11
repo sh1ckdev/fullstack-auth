@@ -6,8 +6,50 @@ const ApiError = require('../exceptions/api-error');
 const crypto = require('crypto');
 const axios = require('axios');
 
+const normalizeYandexAvatarUrl = (value) => {
+    if (!value) {
+        return null;
+    }
+
+    let candidate = value.trim ? value.trim() : value;
+
+    if (!candidate) {
+        return null;
+    }
+
+    if (!/^https?:\/\//i.test(candidate)) {
+        candidate = `https://avatars.mds.yandex.net/get-yapic/${candidate}/islands-200`;
+    }
+
+    try {
+        const parsed = new URL(candidate);
+
+        if (!parsed.hostname.includes('yandex') || !parsed.pathname.includes('/get-yapic/')) {
+            return candidate;
+        }
+
+        const segments = parsed.pathname.split('/').filter(Boolean);
+        const getYapicIndex = segments.indexOf('get-yapic');
+
+        if (getYapicIndex === -1 || segments.length - getYapicIndex < 3) {
+            return candidate;
+        }
+
+        const group = segments[getYapicIndex + 1];
+        const identifierSegments = segments.slice(getYapicIndex + 2, segments.length - 1);
+        const identifier = identifierSegments.join('/') || segments[getYapicIndex + 2];
+        const sizeSegment = segments[segments.length - 1] || 'islands-200';
+        const normalizedSize = sizeSegment.replace(/^islands-retina-/, 'islands-') || 'islands-200';
+
+        return `https://avatars.mds.yandex.net/get-yapic/${group}/${identifier}/${normalizedSize}`;
+    } catch (error) {
+        console.warn('Failed to normalize Yandex avatar url', error);
+        return candidate;
+    }
+};
+
 class UserService {
-    async registration(username, email, password) {
+    async registration(username, email, password) { 
         const candidate = await UserModel.findOne({ $or: [{ username }, { email }] });
         if (candidate) {
             throw ApiError.BadRequest('Пользователь уже существует');
@@ -233,9 +275,9 @@ async refresh(refreshToken) {
                 user = await UserModel.findOne({ email: primaryEmail });
             }
 
-            const avatarUrl = yandexData.default_avatar_id
-                ? `https://avatars.yandex.net/get-yapic/${yandexData.default_avatar_id}/islands-retina-200`
-                : user?.avatarUrl || null;
+            const resolvedAvatarUrl = normalizeYandexAvatarUrl(
+                yandexData.default_avatar_id || user?.avatarUrl || null
+            );
 
             if (!user) {
                 const loginBaseRaw = yandexData.login || yandexData.display_name || `yandex_${yandexId}`;
@@ -258,7 +300,7 @@ async refresh(refreshToken) {
                     password: hashedPassword,
                     roles: ['user'],
                     yandexId,
-                    avatarUrl,
+                    avatarUrl: resolvedAvatarUrl,
                     lastLoginProvider: 'yandex'
                 });
             } else {
@@ -267,8 +309,8 @@ async refresh(refreshToken) {
                     user.yandexId = yandexId;
                     needSave = true;
                 }
-                if (avatarUrl && user.avatarUrl !== avatarUrl) {
-                    user.avatarUrl = avatarUrl;
+                if (resolvedAvatarUrl && user.avatarUrl !== resolvedAvatarUrl) {
+                    user.avatarUrl = resolvedAvatarUrl;
                     needSave = true;
                 }
                 if (user.lastLoginProvider !== 'yandex') {
